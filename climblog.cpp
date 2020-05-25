@@ -43,6 +43,8 @@ struct climb {
   std::string location;
   climb_type type;
   int grade_loc;
+  int stars;
+  std::string comments;
   std::vector<attempt> attempts;
 };
 
@@ -129,9 +131,15 @@ static bool is_input_valid(std::string const& input) {
   else return false;
 }
 
-bool is_equal(std::string const& a, std::string const& b) {
+static bool is_equal(std::string const& a, std::string const& b) {
   return std::equal(a.begin(), a.end(), b.begin(), b.end(),
       [] (char a, char b) { return std::tolower(a) == std::tolower(b); });
+}
+
+static bool is_integer(const std::string& s) {
+    return !s.empty() &&
+      std::find_if(s.begin(), s.end(),
+          [] (char c) { return !std::isdigit(c); }) == s.end();
 }
 
 static void trim_left(std::string& s) {
@@ -157,6 +165,16 @@ static std::string to_string(climb_type const& type) {
   if (type == SPORT) s = "SPORT";
   if (type == TOP_ROPE) s = "TOP ROPE";
   if (type == TRAD) s = "TRAD";
+  return s;
+}
+
+static std::string to_stars(int stars) {
+  std::string s;
+  if (stars == 0) s = "O";
+  if (stars == 1) s = "*";
+  if (stars == 2) s = "**";
+  if (stars == 3) s = "***";
+  if (stars == 4) s = "****";
   return s;
 }
 
@@ -261,6 +279,26 @@ static bool set_yds_grade(climb& c, std::string const& grade) {
   return was_set;
 }
 
+static void print_stars_header() {
+  std::cout << "  > stars: [0-4]: ";
+}
+
+static bool set_stars(climb& c, std::string const& stars) {
+  bool was_set = true;
+  c.stars = 0;
+  if (is_integer(stars)) c.stars = std::atoi(stars.c_str());
+  else was_set = false;
+  if (c.stars < 0) was_set = false;
+  if (c.stars > 4) was_set = false;
+  return was_set;
+}
+
+static void get_comments(climb& c) {
+  std::cout << "  > comments: ";
+  std::getline(std::cin, c.comments);
+  trim(c.comments);
+}
+
 static void add_climb() {
   climb c;
   get_climb_name(c);
@@ -272,6 +310,8 @@ static void add_climb() {
   parse_arg(print_climb_type_header, set_climb_type, c);
   if (c.type == BOULDER) parse_arg(print_v_grade_header, set_v_grade, c);
   else parse_arg(print_yds_grade_header, set_yds_grade, c);
+  parse_arg(print_stars_header, set_stars, c);
+  get_comments(c);
   my_climbs.push_back(c);
 }
 
@@ -302,23 +342,27 @@ static void remove_climb() {
 }
 
 static void print_climbs(std::vector<climb> const& climbs) {
-  std::cout << " -----------------------------------------------------------------------------------------------------------------------------\n";
-  std::cout << "|                     name                      |                   location                    |   type   | grade | attempts |\n";
-  std::cout << " -----------------------------------------------------------------------------------------------------------------------------\n";
+  std::cout << " ----------------------------------------------------------------------------------------------------------------------------------------------------------------------\n";
+  std::cout << "|                  name                    |                 location                 |   type   | grade | stars | attempts |                  comments                |\n";
+  std::cout << " ----------------------------------------------------------------------------------------------------------------------------------------------------------------------\n";
   for (climb const& c : climbs) {
     std::string grade;
     if (c.type == BOULDER) grade = valid_v_grades[c.grade_loc];
     else grade = valid_yds_grades[c.grade_loc];
     std::cout << "| ";
-    std::cout << std::setw(45) << std::left << c.name;
+    std::cout << std::setw(40) << std::left << c.name;
     std::cout << " | ";
-    std::cout << std::setw(45) << std::left << c.location;
+    std::cout << std::setw(40) << std::left << c.location;
     std::cout << " | ";
     std::cout << std::setw(8) << std::left << to_string(c.type);
     std::cout << " | ";
     std::cout << std::setw(5) << std::left << grade;
     std::cout << " | ";
+    std::cout << std::setw(5) << std::left << to_stars(c.stars);
+    std::cout << " | ";
     std::cout << std::setw(8) << std::left << c.attempts.size();
+    std::cout << " | ";
+    std::cout << std::setw(40) << std::left << c.comments;
     std::cout << " | ";
     std::cout << "\n";
   }
@@ -376,7 +420,9 @@ static void read_db() {
     c.location = read_long_str(in);
     c.type = to_type(read_short_str(in));
     c.grade_loc = read_int(in);
+    c.stars = read_int(in);
     c.attempts.resize(read_int(in));
+    c.comments = read_long_str(in);
   }
 }
 
@@ -391,7 +437,9 @@ static void write_db() {
     write_long_str(out, c.location);
     write_short_str(out, to_string(c.type));
     write_int(out, c.grade_loc);
+    write_int(out, c.stars);
     write_int(out, c.attempts.size());
+    write_long_str(out, c.comments);
   }
 }
 
@@ -402,6 +450,7 @@ int main() {
   std::cout << " welcome to climb log \n";
   std::cout << "----------------------\n";
   cl::print_help();
+  if ((0)) cl::write_db(); // zeros out the db for debugging
   cl::read_db();
   std::cout << "> ";
   std::string input;
