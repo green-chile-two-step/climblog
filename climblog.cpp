@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <cassert>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
@@ -25,7 +27,8 @@ enum climb_performance : int {
   FLASH,
   HUNG,
   ONSIGHT,
-  REDPOINT
+  REDPOINT,
+  SEND
 };
 
 struct attempt {
@@ -44,6 +47,8 @@ struct climb {
 };
 
 static std::vector<climb> my_climbs;
+static std::vector<climb> filtered_climbs;
+static const std::string db = "climblog.db";
 
 static const std::vector<std::string> valid_inputs = {
   "q",
@@ -155,6 +160,15 @@ static std::string to_string(climb_type const& type) {
   return s;
 }
 
+static climb_type to_type(std::string const& type ) {
+  climb_type t;
+  if (type == "BOULDER") t = BOULDER;
+  if (type == "SPORT") t = SPORT;
+  if (type == "TOP ROPE") t = TOP_ROPE;
+  if (type == "TRAD") t = TRAD;
+  return t;
+}
+
 static int find_loc(std::string const& grade, std::vector<std::string> const& grades) {
   int loc = -1;
   auto it = std::find(grades.begin(), grades.end(), grade);
@@ -164,7 +178,7 @@ static int find_loc(std::string const& grade, std::vector<std::string> const& gr
 
 static int find_loc(climb const& c, std::vector<climb> const& climbs) {
   int ctr = 0;
-  for (auto& existing_climb : climbs) {
+  for (climb const& existing_climb : climbs) {
     if (is_equal(existing_climb.name, c.name)) {
       if (is_equal(existing_climb.location, c.location)) {
         return ctr;
@@ -291,7 +305,7 @@ static void print_climbs(std::vector<climb> const& climbs) {
   std::cout << " -----------------------------------------------------------------------------------------------------------------------------\n";
   std::cout << "|                     name                      |                   location                    |   type   | grade | attempts |\n";
   std::cout << " -----------------------------------------------------------------------------------------------------------------------------\n";
-  for (auto& c : climbs) {
+  for (climb const& c : climbs) {
     std::string grade;
     if (c.type == BOULDER) grade = valid_v_grades[c.grade_loc];
     else grade = valid_yds_grades[c.grade_loc];
@@ -320,6 +334,67 @@ static bool act_on_input(std::string const& input) {
   return false;
 }
 
+static int read_int(std::ifstream& in) {
+  char buf[4];
+  in.read(buf, 4);
+  return std::atoi(buf);
+}
+
+static void write_int(std::ofstream& out, int num) {
+  std::string const s = std::to_string(num);
+  out.write(s.c_str(), 4);
+}
+
+static std::string read_long_str(std::ifstream& in) {
+  char buf[45];
+  in.read(buf, 45);
+  return std::string(buf);
+}
+
+static void write_long_str(std::ofstream& out, std::string const& str) {
+  out.write(str.c_str(), 45);
+}
+
+static std::string read_short_str(std::ifstream& in) {
+  char buf[8];
+  in.read(buf, 8);
+  return std::string(buf);
+}
+
+static void write_short_str(std::ofstream& out, std::string const& str) {
+  out.write(str.c_str(), 8);
+}
+
+static void read_db() {
+  std::ifstream in(cl::db, std::ios::in | std::ios::binary);
+  assert(in.is_open());
+  int const nclimbs = read_int(in);
+  my_climbs.resize(nclimbs);
+  for (int i = 0; i < nclimbs; ++i) {
+    climb& c = my_climbs[i];
+    c.name = read_long_str(in);
+    c.location = read_long_str(in);
+    c.type = to_type(read_short_str(in));
+    c.grade_loc = read_int(in);
+    c.attempts.resize(read_int(in));
+  }
+}
+
+static void write_db() {
+  std::ofstream out(cl::db, std::ios::out | std::ios::binary);
+  assert(out.is_open());
+  int const nclimbs = my_climbs.size();
+  write_int(out, nclimbs);
+  for (int i = 0; i < nclimbs; ++i) {
+    climb const& c = my_climbs[i];
+    write_long_str(out, c.name);
+    write_long_str(out, c.location);
+    write_short_str(out, to_string(c.type));
+    write_int(out, c.grade_loc);
+    write_int(out, c.attempts.size());
+  }
+}
+
 }
 
 int main() {
@@ -327,6 +402,7 @@ int main() {
   std::cout << " welcome to climb log \n";
   std::cout << "----------------------\n";
   cl::print_help();
+  cl::read_db();
   std::cout << "> ";
   std::string input;
   while (std::getline(std::cin, input)) {
@@ -334,5 +410,6 @@ int main() {
     if (quit) break;
     std::cout << "> ";
   }
+  cl::write_db();
   return 0;
 }
