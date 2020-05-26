@@ -109,15 +109,15 @@ static const std::vector<std::string> valid_yds_grades = {
 
 static void print_help() {
   std::cout << "valid commands\n";
-  std::cout << "  > q             [quit the application]\n";
-  std::cout << "  > quit          [quit the application]\n";
-  std::cout << "  > h             [prompt this help message]\n";
-  std::cout << "  > help          [prompt this help message]\n";
-  std::cout << "  > add climb     [add a climb]\n";
-  std::cout << "  > add attempt   [add a climb attempt]\n";
-  std::cout << "  > remove climb  [remove a climb]\n";
-  std::cout << "  > flush         [flush the database, remove all climbs]\n";
-  std::cout << "  > print         [print all climbs]\n";
+  std::cout << "  > q               [quit the application]\n";
+  std::cout << "  > quit            [quit the application]\n";
+  std::cout << "  > h               [prompt this help message]\n";
+  std::cout << "  > help            [prompt this help message]\n";
+  std::cout << "  > add climb       [add a climb]\n";
+  std::cout << "  > add attempt     [add a climb attempt]\n";
+  std::cout << "  > remove climb    [remove a climb]\n";
+  std::cout << "  > flush           [flush the database, remove all climbs]\n";
+  std::cout << "  > print           [print all climbs]\n";
 }
 
 static void print_invalid_input(std::string const& input) {
@@ -414,6 +414,8 @@ static bool set_climb_performance(attempt& a, std::string const& perf) {
   else if (is_equal(perf, "flash")) a.performance = FLASH;
   else if (is_equal(perf, "h")) a.performance = HUNG;
   else if (is_equal(perf, "hung")) a.performance = HUNG;
+  else if (is_equal(perf, "o")) a.performance = ONSIGHT;
+  else if (is_equal(perf, "onsight")) a.performance = ONSIGHT;
   else if (is_equal(perf, "r")) a.performance = REDPOINT;
   else if (is_equal(perf, "redpoint")) a.performance = REDPOINT;
   else if (is_equal(perf, "s")) a.performance = SEND;
@@ -522,9 +524,19 @@ static void print_climbs(std::vector<climb> const& climbs) {
       std::cout << a.date.year << "-" << a.date.month << "-" << a.date.day << ", ";
       std::cout << to_string(a.style) << ", ";
       std::cout << to_string(a.performance) << ", ";
-      std::cout << a.comments << "\n";
+      if (a.comments != "") {
+        std::cout << ", " << a.comments << "\n";
+      }
     }
   }
+}
+
+static bool alphabetically(climb const& a, climb const& b) {
+  return a.name < b.name;
+}
+
+static void sort_climbs() {
+  std::sort(my_climbs.begin(), my_climbs.end(), alphabetically);
 }
 
 static bool act_on_input(std::string const& input) {
@@ -597,6 +609,7 @@ static void read_db() {
 }
 
 static void write_db() {
+  sort_climbs();
   std::ofstream out(cl::db, std::ios::out | std::ios::binary);
   assert(out.is_open());
   int const nclimbs = my_climbs.size();
