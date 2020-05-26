@@ -31,11 +31,17 @@ enum climb_performance : int {
   SEND
 };
 
+struct climb_date {
+  int year;
+  int month;
+  int day;
+};
+
 struct attempt {
-  std::string comments;
+  climb_date date;
   climb_style style;
   climb_performance perfomance;
-  int num_takes;
+  std::string comments;
 };
 
 struct climb {
@@ -178,7 +184,7 @@ static std::string to_stars(int stars) {
   return s;
 }
 
-static climb_type to_type(std::string const& type ) {
+static climb_type to_type(std::string const& type) {
   climb_type t;
   if (type == "BOULDER") t = BOULDER;
   if (type == "SPORT") t = SPORT;
@@ -343,7 +349,7 @@ static void remove_climb() {
 
 static void print_climbs(std::vector<climb> const& climbs) {
   std::cout << " ----------------------------------------------------------------------------------------------------------------------------------------------------------------------\n";
-  std::cout << "|                  name                    |                 location                 |   type   | grade | stars | attempts |                  comments                |\n";
+  std::cout << "|                  name                    |                 location                 |                  comments                |   type   | grade | stars | attempts |\n";
   std::cout << " ----------------------------------------------------------------------------------------------------------------------------------------------------------------------\n";
   for (climb const& c : climbs) {
     std::string grade;
@@ -354,6 +360,8 @@ static void print_climbs(std::vector<climb> const& climbs) {
     std::cout << " | ";
     std::cout << std::setw(40) << std::left << c.location;
     std::cout << " | ";
+    std::cout << std::setw(40) << std::left << c.comments;
+    std::cout << " | ";
     std::cout << std::setw(8) << std::left << to_string(c.type);
     std::cout << " | ";
     std::cout << std::setw(5) << std::left << grade;
@@ -361,8 +369,6 @@ static void print_climbs(std::vector<climb> const& climbs) {
     std::cout << std::setw(5) << std::left << to_stars(c.stars);
     std::cout << " | ";
     std::cout << std::setw(8) << std::left << c.attempts.size();
-    std::cout << " | ";
-    std::cout << std::setw(40) << std::left << c.comments;
     std::cout << " | ";
     std::cout << "\n";
   }
@@ -418,11 +424,11 @@ static void read_db() {
     climb& c = my_climbs[i];
     c.name = read_long_str(in);
     c.location = read_long_str(in);
+    c.comments = read_long_str(in);
     c.type = to_type(read_short_str(in));
     c.grade_loc = read_int(in);
     c.stars = read_int(in);
     c.attempts.resize(read_int(in));
-    c.comments = read_long_str(in);
   }
 }
 
@@ -435,11 +441,11 @@ static void write_db() {
     climb const& c = my_climbs[i];
     write_long_str(out, c.name);
     write_long_str(out, c.location);
+    write_long_str(out, c.comments);
     write_short_str(out, to_string(c.type));
     write_int(out, c.grade_loc);
     write_int(out, c.stars);
     write_int(out, c.attempts.size());
-    write_long_str(out, c.comments);
   }
 }
 
@@ -450,7 +456,7 @@ int main() {
   std::cout << " welcome to climb log \n";
   std::cout << "----------------------\n";
   cl::print_help();
-  if ((0)) cl::write_db(); // zeros out the db for debugging
+  cl::write_db(); // zeros out the db for debugging
   cl::read_db();
   std::cout << "> ";
   std::string input;
