@@ -40,7 +40,7 @@ struct climb_date {
 struct attempt {
   climb_date date;
   climb_style style;
-  climb_performance perfomance;
+  climb_performance performance;
   std::string comments;
 };
 
@@ -64,7 +64,9 @@ static const std::vector<std::string> valid_inputs = {
   "h",
   "help",
   "add climb",
+  "add attempt",
   "remove climb",
+  "flush",
   "print"
 };
 
@@ -112,7 +114,9 @@ static void print_help() {
   std::cout << "  > h             [prompt this help message]\n";
   std::cout << "  > help          [prompt this help message]\n";
   std::cout << "  > add climb     [add a climb]\n";
+  std::cout << "  > add attempt   [add a climb attempt]\n";
   std::cout << "  > remove climb  [remove a climb]\n";
+  std::cout << "  > flush         [flush the database, remove all climbs]\n";
   std::cout << "  > print         [print all climbs]\n";
 }
 
@@ -174,6 +178,25 @@ static std::string to_string(climb_type const& type) {
   return s;
 }
 
+static std::string to_string(climb_style const& style) {
+  std::string s;
+  if (style == LEAD) s = "LEAD";
+  if (style == TR) s = "TR";
+  if (style == SOLO) s = "SOLO";
+  return s;
+}
+
+static std::string to_string(climb_performance const& perf) {
+  std::string s;
+  if (perf == FELL) s = "FELL";
+  if (perf == FLASH) s = "FLASH";
+  if (perf == HUNG) s = "HUNG";
+  if (perf == ONSIGHT) s = "ONSIGHT";
+  if (perf == REDPOINT) s = "REDPOINT";
+  if (perf == SEND) s = "SEND";
+  return s;
+}
+
 static std::string to_stars(int stars) {
   std::string s;
   if (stars == 0) s = "O";
@@ -191,6 +214,25 @@ static climb_type to_type(std::string const& type) {
   if (type == "TOP ROPE") t = TOP_ROPE;
   if (type == "TRAD") t = TRAD;
   return t;
+}
+
+static climb_style to_style(std::string const& style) {
+  climb_style s;
+  if (style == "LEAD") s = LEAD;
+  if (style == "TR") s = TR;
+  if (style == "SOLO") s = SOLO;
+  return s;
+}
+
+static climb_performance to_performance(std::string const& perf) {
+  climb_performance p;
+  if (perf == "FELL") p = FELL;
+  if (perf == "FLASH") p = FLASH;
+  if (perf == "HUNG") p = HUNG;
+  if (perf == "ONSIGHT") p = ONSIGHT;
+  if (perf == "REDPOINT") p = REDPOINT;
+  if (perf == "SEND") p = SEND;
+  return p;
 }
 
 static int find_loc(std::string const& grade, std::vector<std::string> const& grades) {
@@ -231,13 +273,13 @@ static void get_climb_location(climb& c) {
   trim(c.location);
 }
 
-template <class HEADER, class F>
-void parse_arg(HEADER const& header, F const& f, climb& c) {
+template <class HEADER, class F, class CLIMB_ATTEMPT>
+void parse_arg(HEADER const& header, F const& f, CLIMB_ATTEMPT& ca) {
   std::string arg;
   header();
   while (std::getline(std::cin, arg)) {
     trim(arg);
-    if (f(c, arg)) break;
+    if (f(ca, arg)) break;
     print_invalid_input(arg);
     header();
   }
@@ -249,14 +291,14 @@ static void print_climb_type_header() {
 
 static bool set_climb_type(climb& c, std::string const& type) {
   bool was_set = true;
-  if      (type == "b") c.type = BOULDER;
-  else if (type == "boulder") c.type = BOULDER;
-  else if (type == "s") c.type = SPORT;
-  else if (type == "sport") c.type = SPORT;
-  else if (type == "tr") c.type = TOP_ROPE;
-  else if (type == "top rope") c.type = TOP_ROPE;
-  else if (type == "trad") c.type = TRAD;
-  else if (type == "t") c.type = TRAD;
+  if      (is_equal(type, "b")) c.type = BOULDER;
+  else if (is_equal(type, "boulder")) c.type = BOULDER;
+  else if (is_equal(type, "s")) c.type = SPORT;
+  else if (is_equal(type, "sport")) c.type = SPORT;
+  else if (is_equal(type, "tr")) c.type = TOP_ROPE;
+  else if (is_equal(type, "top rope")) c.type = TOP_ROPE;
+  else if (is_equal(type, "trad")) c.type = TRAD;
+  else if (is_equal(type, "t")) c.type = TRAD;
   else was_set = false;
   return was_set;
 }
@@ -299,10 +341,85 @@ static bool set_stars(climb& c, std::string const& stars) {
   return was_set;
 }
 
-static void get_comments(climb& c) {
+template <class T>
+static void get_comments(T& ca) {
   std::cout << "  > comments: ";
-  std::getline(std::cin, c.comments);
-  trim(c.comments);
+  std::getline(std::cin, ca.comments);
+  trim(ca.comments);
+}
+
+static void print_year_header() {
+  std::cout << "  > year: ";
+}
+
+static bool set_year(attempt& a, std::string const& year) {
+  bool was_set = true;
+  if (is_integer(year)) a.date.year = std::atoi(year.c_str());
+  else was_set = false;
+  return was_set;
+}
+
+static void print_month_header() {
+  std::cout << "  > month: ";
+}
+
+static bool set_month(attempt& a, std::string const& month) {
+  bool was_set = true;
+  if (is_integer(month)) a.date.month = std::atoi(month.c_str());
+  else was_set = false;
+  if (a.date.month < 1) was_set = false;
+  if (a.date.month > 12) was_set = false;
+  return was_set;
+}
+
+static void print_day_header() {
+  std::cout << "  > day: ";
+}
+
+static bool set_day(attempt& a, std::string const& day) {
+  bool was_set = true;
+  if (is_integer(day)) a.date.day = std::atoi(day.c_str());
+  else was_set = false;
+  if (a.date.month < 1) was_set = false;
+  if (a.date.month > 31) was_set = false;
+  return was_set;
+}
+
+
+static void print_climb_style_header() {
+  std::cout << "  > style: [l]ead, [t]op rope, [s]solo: ";
+}
+
+static bool set_climb_style(attempt& a, std::string const& style) {
+  bool was_set = true;
+  if      (is_equal(style, "l")) a.style = LEAD;
+  else if (is_equal(style, "lead")) a.style = LEAD;
+  else if (is_equal(style, "s")) a.style = SOLO;
+  else if (is_equal(style, "solo")) a.style = SOLO;
+  else if (is_equal(style, "t")) a.style = TR;
+  else if (is_equal(style, "top rope")) a.style = TR;
+  else was_set = false;
+  return was_set;
+}
+
+static void print_climb_performance_header() {
+  std::cout << "  > performance: [fe]ll, [fl]ash, [h]ung, [o]nsight, [r]edpoint, [s]end: ";
+}
+
+static bool set_climb_performance(attempt& a, std::string const& perf) {
+  bool was_set = true;
+  if      (is_equal(perf, "fe")) a.performance = FELL;
+  else if (is_equal(perf, "fell")) a.performance = FELL;
+  else if (is_equal(perf, "fl")) a.performance = FLASH;
+  else if (is_equal(perf, "flash")) a.performance = FLASH;
+  else if (is_equal(perf, "h")) a.performance = HUNG;
+  else if (is_equal(perf, "hung")) a.performance = HUNG;
+  else if (is_equal(perf, "r")) a.performance = REDPOINT;
+  else if (is_equal(perf, "redpoint")) a.performance = REDPOINT;
+  else if (is_equal(perf, "s")) a.performance = SEND;
+  else if (is_equal(perf, "send")) a.performance = SEND;
+  else was_set = false;
+  return was_set;
 }
 
 static void add_climb() {
@@ -321,15 +438,30 @@ static void add_climb() {
   my_climbs.push_back(c);
 }
 
-static bool should_remove(climb const& c) {
+static void add_attempt() {
+  climb tmp;
+  get_climb_name(tmp);
+  get_climb_location(tmp);
+  int const loc = find_loc(tmp, my_climbs);
+  if (loc == -1) { print_climb_not_found(tmp); return; }
+  auto& c = my_climbs[loc];
+  attempt a;
+  parse_arg(print_year_header, set_year, a);
+  parse_arg(print_month_header, set_month, a);
+  parse_arg(print_day_header, set_day, a);
+  parse_arg(print_climb_style_header, set_climb_style, a);
+  parse_arg(print_climb_performance_header, set_climb_performance, a);
+  get_comments(a);
+  c.attempts.push_back(a);
+}
+
+static bool should_remove() {
   std::string arg;
-  std::cout << "this will permanantently erase `"
-    << c.name << "` at `" << c.location << "`\n";
   std::cout << "proceed [y/n]: ";
   while (std::getline(std::cin, arg)) {
     trim(arg);
-    if (arg == "y" || arg == "yes") return true;
-    if (arg == "n" || arg == "no") return false;
+    if (is_equal(arg, "y") || is_equal(arg, "yes")) return true;
+    if (is_equal(arg, "n") || is_equal(arg, "no")) return false;
     print_invalid_input(arg);
     std::cout << "proceed [y/n]: ";
   }
@@ -342,8 +474,21 @@ static void remove_climb() {
   get_climb_location(tmp);
   int const loc = find_loc(tmp, my_climbs);
   if (loc == -1) { print_climb_not_found(tmp); return; }
-  if (should_remove(tmp)) {
+  std::cout << "this will permanantently erase `"
+    << tmp.name << "` at `" << tmp.location << "`\n";
+  if (should_remove()) {
     my_climbs.erase(my_climbs.begin() + loc);
+    std::cout << "`" << tmp.name << "` at `" << "` erased\n";
+  }
+}
+
+static void flush() {
+  std::string arg;
+  std::cout << "this will permananently erase all climbs\n";
+  if (should_remove()) {
+    my_climbs.resize(0);
+    my_climbs.shrink_to_fit();
+    std::cout << "all climbs erased\n";
   }
 }
 
@@ -371,16 +516,26 @@ static void print_climbs(std::vector<climb> const& climbs) {
     std::cout << std::setw(8) << std::left << c.attempts.size();
     std::cout << " | ";
     std::cout << "\n";
+    int ctr = 1;
+    for (attempt const& a : c.attempts) {
+      std::cout << "  [" << ctr++ << "]: ";
+      std::cout << a.date.year << "-" << a.date.month << "-" << a.date.day << ", ";
+      std::cout << to_string(a.style) << ", ";
+      std::cout << to_string(a.performance) << ", ";
+      std::cout << a.comments << "\n";
+    }
   }
 }
 
 static bool act_on_input(std::string const& input) {
   if (!is_input_valid(input)) print_invalid_input(input);;
-  if (input == "q" || input == "quit") return true;
-  if (input == "h" || input == "help") print_help();
-  if (input == "add climb") add_climb();
-  if (input == "remove climb") remove_climb();
-  if (input == "print") print_climbs(my_climbs);
+  if (is_equal(input, "q") || is_equal(input, "quit")) return true;
+  if (is_equal(input, "h") || is_equal(input, "help")) print_help();
+  if (is_equal(input, "add climb")) add_climb();
+  if (is_equal(input, "add attempt")) add_attempt();
+  if (is_equal(input, "remove climb")) remove_climb();
+  if (is_equal(input, "flush")) flush();
+  if (is_equal(input, "print")) print_climbs(my_climbs);
   return false;
 }
 
@@ -429,6 +584,15 @@ static void read_db() {
     c.grade_loc = read_int(in);
     c.stars = read_int(in);
     c.attempts.resize(read_int(in));
+    for (size_t j = 0; j < c.attempts.size(); ++j) {
+      attempt& a = c.attempts[j];
+      a.date.year = read_int(in);
+      a.date.month = read_int(in);
+      a.date.day = read_int(in);
+      a.style = to_style(read_short_str(in));
+      a.performance = to_performance(read_short_str(in));
+      a.comments = read_long_str(in);
+    }
   }
 }
 
@@ -446,6 +610,15 @@ static void write_db() {
     write_int(out, c.grade_loc);
     write_int(out, c.stars);
     write_int(out, c.attempts.size());
+    for (size_t j = 0; j < c.attempts.size(); ++j) {
+      attempt const& a = c.attempts[j];
+      write_int(out, a.date.year);
+      write_int(out, a.date.month);
+      write_int(out, a.date.day);
+      write_short_str(out, to_string(a.style));
+      write_short_str(out, to_string(a.performance));
+      write_long_str(out, a.comments);
+    }
   }
 }
 
@@ -456,7 +629,6 @@ int main() {
   std::cout << " welcome to climb log \n";
   std::cout << "----------------------\n";
   cl::print_help();
-  cl::write_db(); // zeros out the db for debugging
   cl::read_db();
   std::cout << "> ";
   std::string input;
